@@ -12,9 +12,7 @@ router.get("/", async (req, res) => {
     type: req.query.type,
     status: req.query.status,
   };
-
   const busStops = await service.getAll(filters);
-
   res.status(200).json({
     count: busStops.length,
     data: busStops,

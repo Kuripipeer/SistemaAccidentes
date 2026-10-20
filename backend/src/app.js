@@ -9,7 +9,6 @@ const {
   logErrors,
   errorHandler,
 } = require("./middlewares/error.handler");
-const incidents = require("./data/incidents.seed");
 
 const app = express();
 
@@ -23,6 +22,10 @@ app.get("/", (req, res) => {
       health: "/api/health",
       incidents: "/api/incidents",
       geojson: "/api/incidents/geojson",
+      busStops: "/api/bus-stops",
+      hydrants: "/api/hydrants",
+      stations: "/api/stations",
+      wifiSpots: "/api/wifi-spots"
     },
   });
 });

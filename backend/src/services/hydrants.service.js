@@ -12,34 +12,26 @@ class HydrantsService {
 
   async getAll(filters = {}) {
     const { search = "", type = "all", status = "all" } = filters;
-
     let result = [...this.hydrants];
-
     const normalizedSearch = this.normalizeText(search);
-
     if (normalizedSearch) {
       result = result.filter((hydrant) => {
         const searchableContent = this.normalizeText(
           `${hydrant.name} ${hydrant.description} ${hydrant.type}`,
         );
-
         return searchableContent.includes(normalizedSearch);
       });
     }
-
     if (type !== "all") {
       result = result.filter((hydrant) => hydrant.type === type);
     }
-
     if (status !== "all") {
       result = result.filter((hydrant) => hydrant.status === status);
     }
-
     // Los más recientes aparecen primero
     result.sort(
       (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
     );
-
     return result;
   }
 

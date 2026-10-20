@@ -11,35 +11,27 @@ class BusStopsService {
   // Obtener todos y filtrar
 
   async getAll(filters = {}) {
-    const { search = "", type = "all", status = "all" } = filters;
-
+    const { search = "", type = "all", status = "all" } = filters
     let result = [...this.busStops];
-
     const normalizedSearch = this.normalizeText(search);
-
     if (normalizedSearch) {
       result = result.filter((busStop) => {
         const searchableContent = this.normalizeText(
           `${busStop.name} ${busStop.description} ${busStop.type}`,
         );
-
         return searchableContent.includes(normalizedSearch);
       });
     }
-
     if (type !== "all") {
       result = result.filter((busStop) => busStop.type === type);
     }
-
     if (status !== "all") {
       result = result.filter((busStop) => busStop.status === status);
     }
-
     // Los más recientes aparecen primero
     result.sort(
       (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
     );
-
     return result;
   }
 

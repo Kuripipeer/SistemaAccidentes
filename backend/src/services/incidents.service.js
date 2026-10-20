@@ -9,34 +9,25 @@ class IncidentsService {
   constructor() {
     this.incidents = structuredClone(seedIncidents);
   }
-
   // Obtener todos y filtrar
-
   async getAll(filters = {}) {
     const { search = "", category = "all", status = "all" } = filters;
-
     let result = [...this.incidents];
-
     const normalizedSearch = this.normalizeText(search);
-
     if (normalizedSearch) {
       result = result.filter((incident) => {
         const seaarchableContent = this.normalizeText(
           `${incident.title} ${incident.description} ${incident.category}`,
         );
-
         return seaarchableContent.includes(normalizedSearch);
       });
     }
-
     if (category !== "all") {
       result = result.filter((incident) => incident.category === category);
     }
-
     if (status !== "all") {
       result = result.filter((incident) => incident.status === status);
     }
-
     // Los más recientes aparecen primero
     result.sort(
       (first, second) => new Date(second.createdAt) - new Date(first.createdAt),

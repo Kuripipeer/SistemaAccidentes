@@ -7,39 +7,29 @@ class WifiSpotsService {
   constructor() {
     this.wifiSpots = structuredClone(seedWifiSpots);
   }
-
   // Obtener todos y filtrar
-
   async getAll(filters = {}) {
     const { search = "", type = "all", status = "all" } = filters;
-
     let result = [...this.wifiSpots];
-
     const normalizedSearch = this.normalizeText(search);
-
     if (normalizedSearch) {
       result = result.filter((wifiSpot) => {
         const searchableContent = this.normalizeText(
           `${wifiSpot.name} ${wifiSpot.description} ${wifiSpot.type}`,
         );
-
         return searchableContent.includes(normalizedSearch);
       });
     }
-
     if (type !== "all") {
       result = result.filter((wifiSpot) => wifiSpot.type === type);
     }
-
     if (status !== "all") {
       result = result.filter((wifiSpot) => wifiSpot.status === status);
     }
-
     // Los más recientes aparecen primero
     result.sort(
       (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
     );
-
     return result;
   }
 

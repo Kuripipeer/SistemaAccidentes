@@ -7,39 +7,29 @@ class StationsService {
   constructor() {
     this.stations = structuredClone(seedStations);
   }
-
   // Obtener todos y filtrar
-
   async getAll(filters = {}) {
     const { search = "", type = "all", status = "all" } = filters;
-
     let result = [...this.stations];
-
     const normalizedSearch = this.normalizeText(search);
-
     if (normalizedSearch) {
       result = result.filter((station) => {
         const searchableContent = this.normalizeText(
           `${station.name} ${station.description} ${station.type}`,
         );
-
         return searchableContent.includes(normalizedSearch);
       });
     }
-
     if (type !== "all") {
       result = result.filter((station) => station.type === type);
     }
-
     if (status !== "all") {
       result = result.filter((station) => station.status === status);
     }
-
     // Los más recientes aparecen primero
     result.sort(
       (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
     );
-
     return result;
   }
 

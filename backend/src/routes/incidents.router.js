@@ -12,9 +12,7 @@ router.get("/", async (req, res) => {
     category: req.query.category,
     status: req.query.status,
   };
-
   const incidents = await service.getAll(filters);
-
   res.status(200).json({
     count: incidents.length,
     data: incidents,
@@ -27,9 +25,7 @@ router.get("/geojson", async (req, res) => {
     category: req.query.category,
     status: req.query.status,
   };
-
   const geoJSON = await service.getGeoJSON(filters);
-
   res.status(200).json(geoJSON);
 });
 

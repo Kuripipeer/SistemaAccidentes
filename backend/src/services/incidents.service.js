@@ -99,6 +99,9 @@ class IncidentsService {
       },
       updatedAt: new Date().toISOString(),
     };
+  
+    this.incidents[index] = updatedIncident;
+    return updatedIncident;
   }
 
   async delete(id) {
@@ -116,7 +119,7 @@ class IncidentsService {
   async getGeoJSON(filters = {}) {
     const incidents = await this.getAll(filters);
     return {
-      type: "FeaturedCollection",
+      type: "FeatureCollection",
       features: incidents.map((incident) => ({
         type: "Feature",
         properties: {

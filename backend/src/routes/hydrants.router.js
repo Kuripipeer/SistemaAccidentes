@@ -37,4 +37,12 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+router.post("/", async (req, res) => {
+  const newHydrant = await service.create(req.body);
+  res.status(201).json({
+    message: "Hidrante creado correctamente",
+    data: newHydrant,
+  });
+});
+
 module.exports = router;

@@ -1,5 +1,7 @@
 "use strict";
 
+const { randomUUID } = require("node:crypto");
+
 const seedHydrants = require("../data/hydrants.seed");
 const AppError = require("../utils/appError");
 
@@ -41,6 +43,26 @@ class HydrantsService {
       throw new AppError(404, "Hidrante no encontrado/inexistente");
     }
     return hydrant;
+  }
+
+  async create(data) {
+    const newHydrant = {
+      id: `HYD-${randomUUID()}`,
+      name: data.name.trim(),
+      type: data.type,
+      status: data.status || "funcional",
+      description: data.description.trim(),
+      pressurePsi: Number(data.pressurePsi),
+      location: {
+        type: "Point",
+        coordinates: [Number(data.longitude), Number(data.latitude)],
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.hydrants.push(newHydrant);
+    return newHydrant;
   }
 
   async getGeoJSON(filters = {}) {

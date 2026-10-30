@@ -1,5 +1,7 @@
 "use strict";
 
+const { randomUUID } = require("node:crypto");
+
 const seedStations = require("../data/stations.seed");
 const AppError = require("../utils/appError");
 
@@ -39,6 +41,26 @@ class StationsService {
       throw new AppError(404, "Estación de emergencia no encontrada/inexistente");
     }
     return station;
+  }
+
+  async create(data) {
+    const newStation = {
+      id: `STA-${randomUUID()}`,
+      name: data.name.trim(),
+      type: data.type,
+      status: data.status || "activa",
+      description: data.description.trim(),
+      units: Number(data.units),
+      location: {
+        type: "Point",
+        coordinates: [Number(data.longitude), Number(data.latitude)],
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.stations.push(newStation);
+    return newStation;
   }
 
   async getGeoJSON(filters = {}) {

@@ -41,4 +41,12 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+router.post("/", async (req, res) => {
+  const newBusStop = await service.create(req.body);
+  res.status(201).json({
+    message: "Parada de transporte creada correctamente",
+    data: newBusStop,
+  });
+});
+
 module.exports = router;

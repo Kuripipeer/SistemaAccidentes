@@ -1,5 +1,7 @@
 "use strict";
 
+const { randomUUID } = require("node:crypto");
+
 const seedBusStops = require("../data/bus-stops.seed");
 const AppError = require("../utils/appError");
 
@@ -41,6 +43,26 @@ class BusStopsService {
       throw new AppError(404, "Parada de transporte no encontrada/inexistente");
     }
     return busStop;
+  }
+
+  async create(data) {
+    const newBusStop = {
+      id: `BUS-${randomUUID()}`,
+      name: data.name.trim(),
+      type: data.type,
+      status: data.status || "operando",
+      description: data.description.trim(),
+      routesCount: Number(data.routesCount),
+      location: {
+        type: "Point",
+        coordinates: [Number(data.longitude), Number(data.latitude)],
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.busStops.push(newBusStop);
+    return newBusStop;
   }
 
   async getGeoJSON(filters = {}) {

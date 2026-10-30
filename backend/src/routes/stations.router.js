@@ -37,4 +37,12 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+router.post("/", async (req, res) => {
+  const newStation = await service.create(req.body);
+  res.status(201).json({
+    message: "Estación de emergencia creada correctamente",
+    data: newStation,
+  });
+});
+
 module.exports = router;

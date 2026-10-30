@@ -39,4 +39,12 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+router.post("/", async (req, res) => {
+  const newIncident = await service.create(req.body);
+  res.status(201).json({
+    message: "Incidente creado correctamente",
+    data: newIncident,
+  });
+});
+
 module.exports = router;

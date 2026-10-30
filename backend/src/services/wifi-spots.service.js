@@ -1,5 +1,7 @@
 "use strict";
 
+const { randomUUID } = require("node:crypto");
+
 const seedWifiSpots = require("../data/wifi-spots.seed");
 const AppError = require("../utils/appError");
 
@@ -39,6 +41,26 @@ class WifiSpotsService {
       throw new AppError(404, "Zona WiFi no encontrada/inexistente");
     }
     return wifiSpot;
+  }
+
+  async create(data) {
+    const newWifiSpot = {
+      id: `WIFI-${randomUUID()}`,
+      name: data.name.trim(),
+      type: data.type,
+      status: data.status || "activa",
+      description: data.description.trim(),
+      speedMbps: Number(data.speedMbps),
+      location: {
+        type: "Point",
+        coordinates: [Number(data.longitude), Number(data.latitude)],
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.wifiSpots.push(newWifiSpot);
+    return newWifiSpot;
   }
 
   async getGeoJSON(filters = {}) {

@@ -37,4 +37,12 @@ router.get("/:id", async (req, res) => {
   });
 });
 
+router.post("/", async (req, res) => {
+  const newWifiSpot = await service.create(req.body);
+  res.status(201).json({
+    message: "Zona WiFi creada correctamente",
+    data: newWifiSpot,
+  });
+});
+
 module.exports = router;

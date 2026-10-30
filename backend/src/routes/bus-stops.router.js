@@ -49,4 +49,22 @@ router.post("/", async (req, res) => {
   });
 });
 
+router.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedBusStop = await service.update(id, req.body);
+  res.status(200).json({
+    message: "Parada de transporte actualizada correctamente",
+    data: updatedBusStop,
+  });
+});
+
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const deletedBusStop = await service.delete(id);
+  res.status(200).json({
+    message: "Parada de transporte eliminada correctamente",
+    data: deletedBusStop,
+  });
+});
+
 module.exports = router;

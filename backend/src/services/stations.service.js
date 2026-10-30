@@ -63,6 +63,62 @@ class StationsService {
     return newStation;
   }
 
+  async update(id, changes) {
+    const index = this.stations.findIndex((station) => station.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Estación de emergencia no encontrada/inexistente con el id: ${id}`,
+      );
+    }
+    const currentStation = this.stations[index];
+    const currentLongitude = currentStation.location.coordinates[0];
+    const currentLatitude = currentStation.location.coordinates[1];
+
+    const updatedLongitude =
+      changes.longitude !== undefined
+        ? Number(changes.longitude)
+        : currentLongitude;
+
+    const updatedLatitude =
+      changes.latitude !== undefined
+        ? Number(changes.latitude)
+        : currentLatitude;
+
+    const updatedStation = {
+      ...currentStation,
+      ...(changes.name !== undefined && { name: changes.name.trim() }),
+      ...(changes.type !== undefined && { type: changes.type }),
+      ...(changes.status !== undefined && { status: changes.status }),
+      ...(changes.description !== undefined && {
+        description: changes.description.trim(),
+      }),
+      ...(changes.units !== undefined && {
+        units: Number(changes.units),
+      }),
+      location: {
+        type: "Point",
+        coordinates: [updatedLongitude, updatedLatitude],
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.stations[index] = updatedStation;
+    return updatedStation;
+  }
+
+  async delete(id) {
+    const index = this.stations.findIndex((station) => station.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Estación de emergencia no encontrada/inexistente con el id: ${id}`,
+      );
+    }
+    const deletedStation = this.stations.splice(index, 1)[0];
+    return deletedStation;
+  }
+
   async getGeoJSON(filters = {}) {
     const stations = await this.getAll(filters);
     return {

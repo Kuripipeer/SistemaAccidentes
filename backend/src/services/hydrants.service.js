@@ -65,6 +65,62 @@ class HydrantsService {
     return newHydrant;
   }
 
+  async update(id, changes) {
+    const index = this.hydrants.findIndex((hydrant) => hydrant.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Hidrante no encontrado/inexistente con el id: ${id}`,
+      );
+    }
+    const currentHydrant = this.hydrants[index];
+    const currentLongitude = currentHydrant.location.coordinates[0];
+    const currentLatitude = currentHydrant.location.coordinates[1];
+
+    const updatedLongitude =
+      changes.longitude !== undefined
+        ? Number(changes.longitude)
+        : currentLongitude;
+
+    const updatedLatitude =
+      changes.latitude !== undefined
+        ? Number(changes.latitude)
+        : currentLatitude;
+
+    const updatedHydrant = {
+      ...currentHydrant,
+      ...(changes.name !== undefined && { name: changes.name.trim() }),
+      ...(changes.type !== undefined && { type: changes.type }),
+      ...(changes.status !== undefined && { status: changes.status }),
+      ...(changes.description !== undefined && {
+        description: changes.description.trim(),
+      }),
+      ...(changes.pressurePsi !== undefined && {
+        pressurePsi: Number(changes.pressurePsi),
+      }),
+      location: {
+        type: "Point",
+        coordinates: [updatedLongitude, updatedLatitude],
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.hydrants[index] = updatedHydrant;
+    return updatedHydrant;
+  }
+
+  async delete(id) {
+    const index = this.hydrants.findIndex((hydrant) => hydrant.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Hidrante no encontrado/inexistente con el id: ${id}`,
+      );
+    }
+    const deletedHydrant = this.hydrants.splice(index, 1)[0];
+    return deletedHydrant;
+  }
+
   async getGeoJSON(filters = {}) {
     const hydrants = await this.getAll(filters);
     return {

@@ -63,6 +63,62 @@ class WifiSpotsService {
     return newWifiSpot;
   }
 
+  async update(id, changes) {
+    const index = this.wifiSpots.findIndex((wifiSpot) => wifiSpot.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Zona WiFi no encontrada/inexistente con el id: ${id}`,
+      );
+    }
+    const currentWifiSpot = this.wifiSpots[index];
+    const currentLongitude = currentWifiSpot.location.coordinates[0];
+    const currentLatitude = currentWifiSpot.location.coordinates[1];
+
+    const updatedLongitude =
+      changes.longitude !== undefined
+        ? Number(changes.longitude)
+        : currentLongitude;
+
+    const updatedLatitude =
+      changes.latitude !== undefined
+        ? Number(changes.latitude)
+        : currentLatitude;
+
+    const updatedWifiSpot = {
+      ...currentWifiSpot,
+      ...(changes.name !== undefined && { name: changes.name.trim() }),
+      ...(changes.type !== undefined && { type: changes.type }),
+      ...(changes.status !== undefined && { status: changes.status }),
+      ...(changes.description !== undefined && {
+        description: changes.description.trim(),
+      }),
+      ...(changes.speedMbps !== undefined && {
+        speedMbps: Number(changes.speedMbps),
+      }),
+      location: {
+        type: "Point",
+        coordinates: [updatedLongitude, updatedLatitude],
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.wifiSpots[index] = updatedWifiSpot;
+    return updatedWifiSpot;
+  }
+
+  async delete(id) {
+    const index = this.wifiSpots.findIndex((wifiSpot) => wifiSpot.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Zona WiFi no encontrada/inexistente con el id: ${id}`,
+      );
+    }
+    const deletedWifiSpot = this.wifiSpots.splice(index, 1)[0];
+    return deletedWifiSpot;
+  }
+
   async getGeoJSON(filters = {}) {
     const wifiSpots = await this.getAll(filters);
     return {

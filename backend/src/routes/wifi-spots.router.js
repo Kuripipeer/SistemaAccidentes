@@ -45,4 +45,22 @@ router.post("/", async (req, res) => {
   });
 });
 
+router.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedWifiSpot = await service.update(id, req.body);
+  res.status(200).json({
+    message: "Zona WiFi actualizada correctamente",
+    data: updatedWifiSpot,
+  });
+});
+
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const deletedWifiSpot = await service.delete(id);
+  res.status(200).json({
+    message: "Zona WiFi eliminada correctamente",
+    data: deletedWifiSpot,
+  });
+});
+
 module.exports = router;

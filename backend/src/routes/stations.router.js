@@ -45,4 +45,22 @@ router.post("/", async (req, res) => {
   });
 });
 
+router.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedStation = await service.update(id, req.body);
+  res.status(200).json({
+    message: "Estación de emergencia actualizada correctamente",
+    data: updatedStation,
+  });
+});
+
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const deletedStation = await service.delete(id);
+  res.status(200).json({
+    message: "Estación de emergencia eliminada correctamente",
+    data: deletedStation,
+  });
+});
+
 module.exports = router;

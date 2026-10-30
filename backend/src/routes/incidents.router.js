@@ -47,4 +47,22 @@ router.post("/", async (req, res) => {
   });
 });
 
+router.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedIncident = await service.update(id, req.body);
+  res.status(200).json({
+    message: "Incidente actualizado correctamente",
+    data: updatedIncident,
+  });
+});
+
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const deletedIncident = await service.delete(id);
+  res.status(200).json({
+    message: "Incidente eliminado correctamente",
+    data: deletedIncident,
+  });
+});
+
 module.exports = router;

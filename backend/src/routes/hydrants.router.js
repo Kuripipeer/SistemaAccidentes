@@ -45,4 +45,22 @@ router.post("/", async (req, res) => {
   });
 });
 
+router.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const updatedHydrant = await service.update(id, req.body);
+  res.status(200).json({
+    message: "Hidrante actualizado correctamente",
+    data: updatedHydrant,
+  });
+});
+
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const deletedHydrant = await service.delete(id);
+  res.status(200).json({
+    message: "Hidrante eliminado correctamente",
+    data: deletedHydrant,
+  });
+});
+
 module.exports = router;

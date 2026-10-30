@@ -65,6 +65,62 @@ class BusStopsService {
     return newBusStop;
   }
 
+  async update(id, changes) {
+    const index = this.busStops.findIndex((busStop) => busStop.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Parada de transporte no encontrada/inexistente con el id: ${id}`,
+      );
+    }
+    const currentBusStop = this.busStops[index];
+    const currentLongitude = currentBusStop.location.coordinates[0];
+    const currentLatitude = currentBusStop.location.coordinates[1];
+
+    const updatedLongitude =
+      changes.longitude !== undefined
+        ? Number(changes.longitude)
+        : currentLongitude;
+
+    const updatedLatitude =
+      changes.latitude !== undefined
+        ? Number(changes.latitude)
+        : currentLatitude;
+
+    const updatedBusStop = {
+      ...currentBusStop,
+      ...(changes.name !== undefined && { name: changes.name.trim() }),
+      ...(changes.type !== undefined && { type: changes.type }),
+      ...(changes.status !== undefined && { status: changes.status }),
+      ...(changes.description !== undefined && {
+        description: changes.description.trim(),
+      }),
+      ...(changes.routesCount !== undefined && {
+        routesCount: Number(changes.routesCount),
+      }),
+      location: {
+        type: "Point",
+        coordinates: [updatedLongitude, updatedLatitude],
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.busStops[index] = updatedBusStop;
+    return updatedBusStop;
+  }
+
+  async delete(id) {
+    const index = this.busStops.findIndex((busStop) => busStop.id === id);
+    if (index === -1) {
+      throw new AppError(
+        404,
+        `Parada de transporte no encontrada/inexistente con el id: ${id}`,
+      );
+    }
+    const deletedBusStop = this.busStops.splice(index, 1)[0];
+    return deletedBusStop;
+  }
+
   async getGeoJSON(filters = {}) {
     const busStops = await this.getAll(filters);
     return {

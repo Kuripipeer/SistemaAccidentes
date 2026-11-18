@@ -1,128 +1,54 @@
 "use strict";
 
-const { randomUUID } = require("node:crypto");
-
-const seedBusStops = require("../data/bus-stops.seed");
+const mongoose = require("mongoose");
+const { BusStopModel } = require("../models/bus-stop.model");
 const AppError = require("../utils/appError");
 
 class BusStopsService {
-  constructor() {
-    this.busStops = structuredClone(seedBusStops);
-  }
-
-  // Obtener todos y filtrar
-
   async getAll(filters = {}) {
-    const { search = "", type = "all", status = "all" } = filters
-    let result = [...this.busStops];
-    const normalizedSearch = this.normalizeText(search);
-    if (normalizedSearch) {
-      result = result.filter((busStop) => {
-        const searchableContent = this.normalizeText(
-          `${busStop.name} ${busStop.description} ${busStop.type}`,
-        );
-        return searchableContent.includes(normalizedSearch);
-      });
-    }
+    const { search = "", type = "all", status = "all" } = filters;
+
+    const query = {};
+
     if (type !== "all") {
-      result = result.filter((busStop) => busStop.type === type);
+      query.type = type;
     }
+
     if (status !== "all") {
-      result = result.filter((busStop) => busStop.status === status);
+      query.status = status;
     }
-    // Los más recientes aparecen primero
-    result.sort(
-      (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
-    );
-    return result;
+
+    const text = search ? String(search).trim() : "";
+
+    if (text) {
+      const regex = new RegExp(this.escapeRegex(text), "i");
+      query.$or = [
+        { name: regex },
+        { description: regex },
+        { type: regex },
+      ];
+    }
+
+    return BusStopModel.find(query).sort({ createdAt: -1 });
   }
 
   async getById(id) {
-    const busStop = this.busStops.find((busStop) => busStop.id === id);
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AppError(404, `No se encontró la parada de transporte con ID ${id}`);
+    }
+
+    const busStop = await BusStopModel.findById(id);
+
     if (!busStop) {
-      throw new AppError(404, "Parada de transporte no encontrada/inexistente");
+      throw new AppError(404, `No se encontró la parada de transporte con ID ${id}`);
     }
+
     return busStop;
-  }
-
-  async create(data) {
-    const newBusStop = {
-      id: `BUS-${randomUUID()}`,
-      name: data.name.trim(),
-      type: data.type,
-      status: data.status || "operando",
-      description: data.description.trim(),
-      routesCount: Number(data.routesCount),
-      location: {
-        type: "Point",
-        coordinates: [Number(data.longitude), Number(data.latitude)],
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.busStops.push(newBusStop);
-    return newBusStop;
-  }
-
-  async update(id, changes) {
-    const index = this.busStops.findIndex((busStop) => busStop.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Parada de transporte no encontrada/inexistente con el id: ${id}`,
-      );
-    }
-    const currentBusStop = this.busStops[index];
-    const currentLongitude = currentBusStop.location.coordinates[0];
-    const currentLatitude = currentBusStop.location.coordinates[1];
-
-    const updatedLongitude =
-      changes.longitude !== undefined
-        ? Number(changes.longitude)
-        : currentLongitude;
-
-    const updatedLatitude =
-      changes.latitude !== undefined
-        ? Number(changes.latitude)
-        : currentLatitude;
-
-    const updatedBusStop = {
-      ...currentBusStop,
-      ...(changes.name !== undefined && { name: changes.name.trim() }),
-      ...(changes.type !== undefined && { type: changes.type }),
-      ...(changes.status !== undefined && { status: changes.status }),
-      ...(changes.description !== undefined && {
-        description: changes.description.trim(),
-      }),
-      ...(changes.routesCount !== undefined && {
-        routesCount: Number(changes.routesCount),
-      }),
-      location: {
-        type: "Point",
-        coordinates: [updatedLongitude, updatedLatitude],
-      },
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.busStops[index] = updatedBusStop;
-    return updatedBusStop;
-  }
-
-  async delete(id) {
-    const index = this.busStops.findIndex((busStop) => busStop.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Parada de transporte no encontrada/inexistente con el id: ${id}`,
-      );
-    }
-    const deletedBusStop = this.busStops.splice(index, 1)[0];
-    return deletedBusStop;
   }
 
   async getGeoJSON(filters = {}) {
     const busStops = await this.getAll(filters);
+
     return {
       type: "FeatureCollection",
       features: busStops.map((busStop) => ({
@@ -142,12 +68,65 @@ class BusStopsService {
     };
   }
 
-  normalizeText(value) {
-    return String(value)
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim();
+  async create(data) {
+    return BusStopModel.create({
+      name: data.name.trim(),
+      type: data.type.trim(),
+      status: data.status.trim(),
+      description: data.description.trim(),
+      routesCount: Number(data.routesCount),
+      location: {
+        type: "Point",
+        coordinates: [Number(data.longitude), Number(data.latitude)],
+      },
+    });
+  }
+
+  async update(id, changes) {
+    const busStop = await this.getById(id);
+
+    if (changes.name !== undefined) {
+      changes.name = changes.name.trim();
+    }
+    if (changes.type !== undefined) {
+      changes.type = changes.type.trim();
+    }
+    if (changes.status !== undefined) {
+      changes.status = changes.status.trim();
+    }
+    if (changes.description !== undefined) {
+      changes.description = changes.description.trim();
+    }
+    if (changes.routesCount !== undefined) {
+      changes.routesCount = Number(changes.routesCount);
+    }
+
+    ["name", "type", "status", "description", "routesCount"].forEach((field) => {
+      if (changes[field] !== undefined) {
+        busStop[field] = changes[field];
+      }
+    });
+
+    if (changes.latitude !== undefined || changes.longitude !== undefined) {
+      const [currentLongitude, currentLatitude] = busStop.location.coordinates;
+      busStop.location.coordinates = [
+        changes.longitude !== undefined ? Number(changes.longitude) : currentLongitude,
+        changes.latitude !== undefined ? Number(changes.latitude) : currentLatitude,
+      ];
+    }
+
+    await busStop.save();
+    return busStop;
+  }
+
+  async delete(id) {
+    const busStop = await this.getById(id);
+    await busStop.deleteOne();
+    return busStop;
+  }
+
+  escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

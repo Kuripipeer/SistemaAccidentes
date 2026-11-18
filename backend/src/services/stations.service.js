@@ -1,126 +1,54 @@
 "use strict";
 
-const { randomUUID } = require("node:crypto");
-
-const seedStations = require("../data/stations.seed");
+const mongoose = require("mongoose");
+const { StationModel } = require("../models/station.model");
 const AppError = require("../utils/appError");
 
 class StationsService {
-  constructor() {
-    this.stations = structuredClone(seedStations);
-  }
-  // Obtener todos y filtrar
   async getAll(filters = {}) {
     const { search = "", type = "all", status = "all" } = filters;
-    let result = [...this.stations];
-    const normalizedSearch = this.normalizeText(search);
-    if (normalizedSearch) {
-      result = result.filter((station) => {
-        const searchableContent = this.normalizeText(
-          `${station.name} ${station.description} ${station.type}`,
-        );
-        return searchableContent.includes(normalizedSearch);
-      });
-    }
+
+    const query = {};
+
     if (type !== "all") {
-      result = result.filter((station) => station.type === type);
+      query.type = type;
     }
+
     if (status !== "all") {
-      result = result.filter((station) => station.status === status);
+      query.status = status;
     }
-    // Los más recientes aparecen primero
-    result.sort(
-      (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
-    );
-    return result;
+
+    const text = search ? String(search).trim() : "";
+
+    if (text) {
+      const regex = new RegExp(this.escapeRegex(text), "i");
+      query.$or = [
+        { name: regex },
+        { description: regex },
+        { type: regex },
+      ];
+    }
+
+    return StationModel.find(query).sort({ createdAt: -1 });
   }
 
   async getById(id) {
-    const station = this.stations.find((station) => station.id === id);
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AppError(404, `No se encontró la estación de emergencia con ID ${id}`);
+    }
+
+    const station = await StationModel.findById(id);
+
     if (!station) {
-      throw new AppError(404, "Estación de emergencia no encontrada/inexistente");
+      throw new AppError(404, `No se encontró la estación de emergencia con ID ${id}`);
     }
+
     return station;
-  }
-
-  async create(data) {
-    const newStation = {
-      id: `STA-${randomUUID()}`,
-      name: data.name.trim(),
-      type: data.type,
-      status: data.status || "activa",
-      description: data.description.trim(),
-      units: Number(data.units),
-      location: {
-        type: "Point",
-        coordinates: [Number(data.longitude), Number(data.latitude)],
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.stations.push(newStation);
-    return newStation;
-  }
-
-  async update(id, changes) {
-    const index = this.stations.findIndex((station) => station.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Estación de emergencia no encontrada/inexistente con el id: ${id}`,
-      );
-    }
-    const currentStation = this.stations[index];
-    const currentLongitude = currentStation.location.coordinates[0];
-    const currentLatitude = currentStation.location.coordinates[1];
-
-    const updatedLongitude =
-      changes.longitude !== undefined
-        ? Number(changes.longitude)
-        : currentLongitude;
-
-    const updatedLatitude =
-      changes.latitude !== undefined
-        ? Number(changes.latitude)
-        : currentLatitude;
-
-    const updatedStation = {
-      ...currentStation,
-      ...(changes.name !== undefined && { name: changes.name.trim() }),
-      ...(changes.type !== undefined && { type: changes.type }),
-      ...(changes.status !== undefined && { status: changes.status }),
-      ...(changes.description !== undefined && {
-        description: changes.description.trim(),
-      }),
-      ...(changes.units !== undefined && {
-        units: Number(changes.units),
-      }),
-      location: {
-        type: "Point",
-        coordinates: [updatedLongitude, updatedLatitude],
-      },
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.stations[index] = updatedStation;
-    return updatedStation;
-  }
-
-  async delete(id) {
-    const index = this.stations.findIndex((station) => station.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Estación de emergencia no encontrada/inexistente con el id: ${id}`,
-      );
-    }
-    const deletedStation = this.stations.splice(index, 1)[0];
-    return deletedStation;
   }
 
   async getGeoJSON(filters = {}) {
     const stations = await this.getAll(filters);
+
     return {
       type: "FeatureCollection",
       features: stations.map((station) => ({
@@ -140,12 +68,65 @@ class StationsService {
     };
   }
 
-  normalizeText(value) {
-    return String(value)
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim();
+  async create(data) {
+    return StationModel.create({
+      name: data.name.trim(),
+      type: data.type.trim(),
+      status: data.status.trim(),
+      description: data.description.trim(),
+      units: Number(data.units),
+      location: {
+        type: "Point",
+        coordinates: [Number(data.longitude), Number(data.latitude)],
+      },
+    });
+  }
+
+  async update(id, changes) {
+    const station = await this.getById(id);
+
+    if (changes.name !== undefined) {
+      changes.name = changes.name.trim();
+    }
+    if (changes.type !== undefined) {
+      changes.type = changes.type.trim();
+    }
+    if (changes.status !== undefined) {
+      changes.status = changes.status.trim();
+    }
+    if (changes.description !== undefined) {
+      changes.description = changes.description.trim();
+    }
+    if (changes.units !== undefined) {
+      changes.units = Number(changes.units);
+    }
+
+    ["name", "type", "status", "description", "units"].forEach((field) => {
+      if (changes[field] !== undefined) {
+        station[field] = changes[field];
+      }
+    });
+
+    if (changes.latitude !== undefined || changes.longitude !== undefined) {
+      const [currentLongitude, currentLatitude] = station.location.coordinates;
+      station.location.coordinates = [
+        changes.longitude !== undefined ? Number(changes.longitude) : currentLongitude,
+        changes.latitude !== undefined ? Number(changes.latitude) : currentLatitude,
+      ];
+    }
+
+    await station.save();
+    return station;
+  }
+
+  async delete(id) {
+    const station = await this.getById(id);
+    await station.deleteOne();
+    return station;
+  }
+
+  escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

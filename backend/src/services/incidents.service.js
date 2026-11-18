@@ -1,123 +1,60 @@
 "use strict";
 
-const { randomUUID } = require("node:crypto");
+const mongoose = require("mongoose");
 
-const seedIncidents = require("../data/incidents.seed");
+const IncidentModel = require("../models/incident.model");
 const AppError = require("../utils/appError");
 
 class IncidentsService {
-  constructor() {
-    this.incidents = structuredClone(seedIncidents);
-  }
-  // Obtener todos y filtrar
   async getAll(filters = {}) {
-    const { search = "", category = "all", status = "all" } = filters;
-    let result = [...this.incidents];
-    const normalizedSearch = this.normalizeText(search);
-    if (normalizedSearch) {
-      result = result.filter((incident) => {
-        const seaarchableContent = this.normalizeText(
-          `${incident.title} ${incident.description} ${incident.category}`,
-        );
-        return seaarchableContent.includes(normalizedSearch);
-      });
-    }
-    if (category !== "all") {
-      result = result.filter((incident) => incident.category === category);
-    }
-    if (status !== "all") {
-      result = result.filter((incident) => incident.status === status);
-    }
-    // Los más recientes aparecen primero
-    result.sort(
-      (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
-    );
+    const {
+      search = "",
+      category = "all",
+      status = "all",
+    } = filters;
 
-    return result;
+    const query = {};
+
+    if (category !== "all") {
+      query.category = category;
+    }
+
+    if (status !== "all") {
+      query.status = status;
+    }
+
+    const text = search ? String(search).trim() : "";
+
+    if (text) {
+      const regex = new RegExp(this.escapeRegex(text), "i");
+
+      query.$or = [
+        { title: regex },
+        { description: regex },
+        { category: regex },
+      ];
+    }
+
+    return IncidentModel.find(query).sort({ createdAt: -1 });
   }
 
   async getById(id) {
-    const incident = this.incidents.find((incident) => incident.id === id);
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AppError(404, `No se encontró el incidente con ID ${id}`);
+    }
+
+    const incident = await IncidentModel.findById(id);
+
     if (!incident) {
-      throw new AppError(404, "Incidente no encontrado/inexistente");
+      throw new AppError(404, `No se encontró el incidente con ID ${id}`);
     }
+
     return incident;
-  }
-
-  async create(data) {
-    const newIncident = {
-      id: `INC-${randomUUID()}`,
-      title: data.title.trim(),
-      category: data.category,
-      description: data.description.trim(),
-      status: "pendiente",
-      location: {
-        type: "Point",
-        coordinates: [Number(data.longitude), Number(data.latitude)],
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.incidents.push(newIncident);
-    return newIncident;
-  }
-
-  async update(id, changes) {
-    const index = this.incidents.findIndex((incident) => incident.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Incidente no encontrado/inexistente con el id: ${id}`,
-      );
-    }
-    const currentIncident = this.incidents[index];
-    const currentLongitude = currentIncident.location.coordinates[0];
-    const currentLatitude = currentIncident.location.coordinates[1];
-
-    const updatedLongitude =
-      changes.longitude !== undefined
-        ? Number(changes.longitude)
-        : currentLongitude;
-
-    const updatedLatitude =
-      changes.latitude !== undefined
-        ? Number(changes.latitude)
-        : currentLatitude;
-
-    const updatedIncident = {
-      ...currentIncident,
-      ...(changes.title !== undefined && { title: changes.title.trim() }),
-      ...(changes.category !== undefined && { category: changes.category }),
-      ...(changes.description !== undefined && {
-        description: changes.description.trim(),
-      }),
-      ...(changes.status !== undefined && { status: changes.status }),
-      location: {
-        type: "Point",
-        coordinates: [updatedLongitude, updatedLatitude],
-      },
-      updatedAt: new Date().toISOString(),
-    };
-  
-    this.incidents[index] = updatedIncident;
-    return updatedIncident;
-  }
-
-  async delete(id) {
-    const index = this.incidents.findIndex((incident) => incident.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Incidente no encontrado/inexistente con el id: ${id}`,
-      );
-    }
-    const deletedIncident = this.incidents.splice(index, 1)[0];
-    return deletedIncident;
   }
 
   async getGeoJSON(filters = {}) {
     const incidents = await this.getAll(filters);
+
     return {
       type: "FeatureCollection",
       features: incidents.map((incident) => ({
@@ -136,12 +73,71 @@ class IncidentsService {
     };
   }
 
-  normalizeText(value) {
-    return String(value)
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim();
+  async create(data) {
+    return IncidentModel.create({
+      title: data.title.trim(),
+      category: data.category.trim(),
+      description: data.description.trim(),
+      status: data.status.trim(),
+      location: {
+        type: "Point",
+        coordinates: [
+          Number(data.longitude),
+          Number(data.latitude),
+        ],
+      },
+    });
+  }
+
+  async update(id, changes) {
+    const incident = await this.getById(id);
+
+    if (changes.title !== undefined) {
+      changes.title = changes.title.trim();
+    }
+
+    if (changes.category !== undefined) {
+      changes.category = changes.category.trim();
+    }
+
+    if (changes.description !== undefined) {
+      changes.description = changes.description.trim();
+    }
+
+    if (changes.status !== undefined) {
+      changes.status = changes.status.trim();
+    }
+
+    ["title", "category", "description", "status"].forEach((field) => {
+      if (changes[field] !== undefined) {
+        incident[field] = changes[field];
+      }
+    });
+
+    if (changes.latitude !== undefined || changes.longitude !== undefined) {
+      const [currentLongitude, currentLatitude] = incident.location.coordinates;
+
+      incident.location.coordinates = [
+        changes.longitude !== undefined ? Number(changes.longitude) : currentLongitude,
+        changes.latitude !== undefined ? Number(changes.latitude) : currentLatitude,
+      ];
+    }
+
+    await incident.save();
+
+    return incident;
+  }
+
+  async delete(id) {
+    const incident = await this.getById(id);
+
+    await incident.deleteOne();
+
+    return incident;
+  }
+
+  escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

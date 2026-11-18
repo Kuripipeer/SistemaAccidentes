@@ -1,0 +1,40 @@
+@api = http://localhost:3000/api/incidents
+
+### 14. Latitud fuera de rango
+POST {{api}}
+Content-Type: application/json
+
+{
+  "title": "Prueba",
+  "category": "bache",
+  "description": "Prueba de latitud",
+  "status": "pendiente",
+  "latitude": 120,
+  "longitude": -101.68
+}
+
+### 15. Solo un campo en POST
+POST {{api}}
+Content-Type: application/json
+
+{
+  "title": "Solo título"
+}
+
+### 16. PATCH con un campo que no existe
+PATCH {{api}}/INC-001
+Content-Type: application/json
+
+{
+  "color": "rojo"
+}
+
+### 17. JSON mal escrito (falta la llave de cierre)
+POST {{api}}
+Content-Type: application/json
+
+{
+  "title": "sin cerrar"
+
+### 18. Filtro con categoría inválida
+GET {{api}}?category=meteorito

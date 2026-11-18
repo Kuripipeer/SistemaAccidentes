@@ -1,128 +1,54 @@
 "use strict";
 
-const { randomUUID } = require("node:crypto");
-
-const seedHydrants = require("../data/hydrants.seed");
+const mongoose = require("mongoose");
+const { HydrantModel } = require("../models/hydrant.model");
 const AppError = require("../utils/appError");
 
 class HydrantsService {
-  constructor() {
-    this.hydrants = structuredClone(seedHydrants);
-  }
-
-  // Obtener todos y filtrar
-
   async getAll(filters = {}) {
     const { search = "", type = "all", status = "all" } = filters;
-    let result = [...this.hydrants];
-    const normalizedSearch = this.normalizeText(search);
-    if (normalizedSearch) {
-      result = result.filter((hydrant) => {
-        const searchableContent = this.normalizeText(
-          `${hydrant.name} ${hydrant.description} ${hydrant.type}`,
-        );
-        return searchableContent.includes(normalizedSearch);
-      });
-    }
+
+    const query = {};
+
     if (type !== "all") {
-      result = result.filter((hydrant) => hydrant.type === type);
+      query.type = type;
     }
+
     if (status !== "all") {
-      result = result.filter((hydrant) => hydrant.status === status);
+      query.status = status;
     }
-    // Los más recientes aparecen primero
-    result.sort(
-      (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
-    );
-    return result;
+
+    const text = search ? String(search).trim() : "";
+
+    if (text) {
+      const regex = new RegExp(this.escapeRegex(text), "i");
+      query.$or = [
+        { name: regex },
+        { description: regex },
+        { type: regex },
+      ];
+    }
+
+    return HydrantModel.find(query).sort({ createdAt: -1 });
   }
 
   async getById(id) {
-    const hydrant = this.hydrants.find((hydrant) => hydrant.id === id);
+    if (!mongoose.isValidObjectId(id)) {
+      throw new AppError(404, `No se encontró el hidrante con ID ${id}`);
+    }
+
+    const hydrant = await HydrantModel.findById(id);
+
     if (!hydrant) {
-      throw new AppError(404, "Hidrante no encontrado/inexistente");
+      throw new AppError(404, `No se encontró el hidrante con ID ${id}`);
     }
+
     return hydrant;
-  }
-
-  async create(data) {
-    const newHydrant = {
-      id: `HYD-${randomUUID()}`,
-      name: data.name.trim(),
-      type: data.type,
-      status: data.status || "funcional",
-      description: data.description.trim(),
-      pressurePsi: Number(data.pressurePsi),
-      location: {
-        type: "Point",
-        coordinates: [Number(data.longitude), Number(data.latitude)],
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.hydrants.push(newHydrant);
-    return newHydrant;
-  }
-
-  async update(id, changes) {
-    const index = this.hydrants.findIndex((hydrant) => hydrant.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Hidrante no encontrado/inexistente con el id: ${id}`,
-      );
-    }
-    const currentHydrant = this.hydrants[index];
-    const currentLongitude = currentHydrant.location.coordinates[0];
-    const currentLatitude = currentHydrant.location.coordinates[1];
-
-    const updatedLongitude =
-      changes.longitude !== undefined
-        ? Number(changes.longitude)
-        : currentLongitude;
-
-    const updatedLatitude =
-      changes.latitude !== undefined
-        ? Number(changes.latitude)
-        : currentLatitude;
-
-    const updatedHydrant = {
-      ...currentHydrant,
-      ...(changes.name !== undefined && { name: changes.name.trim() }),
-      ...(changes.type !== undefined && { type: changes.type }),
-      ...(changes.status !== undefined && { status: changes.status }),
-      ...(changes.description !== undefined && {
-        description: changes.description.trim(),
-      }),
-      ...(changes.pressurePsi !== undefined && {
-        pressurePsi: Number(changes.pressurePsi),
-      }),
-      location: {
-        type: "Point",
-        coordinates: [updatedLongitude, updatedLatitude],
-      },
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.hydrants[index] = updatedHydrant;
-    return updatedHydrant;
-  }
-
-  async delete(id) {
-    const index = this.hydrants.findIndex((hydrant) => hydrant.id === id);
-    if (index === -1) {
-      throw new AppError(
-        404,
-        `Hidrante no encontrado/inexistente con el id: ${id}`,
-      );
-    }
-    const deletedHydrant = this.hydrants.splice(index, 1)[0];
-    return deletedHydrant;
   }
 
   async getGeoJSON(filters = {}) {
     const hydrants = await this.getAll(filters);
+
     return {
       type: "FeatureCollection",
       features: hydrants.map((hydrant) => ({
@@ -142,12 +68,65 @@ class HydrantsService {
     };
   }
 
-  normalizeText(value) {
-    return String(value)
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim();
+  async create(data) {
+    return HydrantModel.create({
+      name: data.name.trim(),
+      type: data.type.trim(),
+      status: data.status.trim(),
+      description: data.description.trim(),
+      pressurePsi: Number(data.pressurePsi),
+      location: {
+        type: "Point",
+        coordinates: [Number(data.longitude), Number(data.latitude)],
+      },
+    });
+  }
+
+  async update(id, changes) {
+    const hydrant = await this.getById(id);
+
+    if (changes.name !== undefined) {
+      changes.name = changes.name.trim();
+    }
+    if (changes.type !== undefined) {
+      changes.type = changes.type.trim();
+    }
+    if (changes.status !== undefined) {
+      changes.status = changes.status.trim();
+    }
+    if (changes.description !== undefined) {
+      changes.description = changes.description.trim();
+    }
+    if (changes.pressurePsi !== undefined) {
+      changes.pressurePsi = Number(changes.pressurePsi);
+    }
+
+    ["name", "type", "status", "description", "pressurePsi"].forEach((field) => {
+      if (changes[field] !== undefined) {
+        hydrant[field] = changes[field];
+      }
+    });
+
+    if (changes.latitude !== undefined || changes.longitude !== undefined) {
+      const [currentLongitude, currentLatitude] = hydrant.location.coordinates;
+      hydrant.location.coordinates = [
+        changes.longitude !== undefined ? Number(changes.longitude) : currentLongitude,
+        changes.latitude !== undefined ? Number(changes.latitude) : currentLatitude,
+      ];
+    }
+
+    await hydrant.save();
+    return hydrant;
+  }
+
+  async delete(id) {
+    const hydrant = await this.getById(id);
+    await hydrant.deleteOne();
+    return hydrant;
+  }
+
+  escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 
